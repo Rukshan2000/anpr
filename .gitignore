@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+sort/
+yolov8n.pt
+*.mp4
+*.csv

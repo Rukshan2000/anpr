@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ANPR Live</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --text: #16181d; --muted: #646a76; --border: #dfe2e8;
+    --accent: #1f6feb; --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --plate: #f7d117;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0e1116; --panel: #161b22; --text: #e6edf3; --muted: #8d96a0; --border: #2b313a;
+            --accent: #4493f8; --ok: #3fb950; --warn: #d29922; --bad: #f85149; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px;
+           border-bottom: 1px solid var(--border); background: var(--panel); }
+  h1 { font-size: 18px; margin: 0 auto 0 0; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px;
+          border: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.live .dot { background: var(--ok); } .pill.ended .dot { background: var(--warn); }
+  .pill.error .dot { background: var(--bad); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px 20px;
+         max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; min-width: 0; }
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+  input { flex: 1 1 260px; min-width: 0; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+          background: var(--bg); color: var(--text); font: inherit; }
+  button { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel);
+           color: var(--text); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .presets button { font-size: 13px; padding: 4px 10px; }
+  .video { margin-top: 14px; position: relative; background: #000; border-radius: 8px; overflow: hidden;
+           aspect-ratio: 16 / 9; display: grid; place-items: center; }
+  .video img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .video p { position: absolute; color: #c9d1d9; margin: 0; padding: 16px; text-align: center; }
+  .meta { display: flex; gap: 16px; margin-top: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .error { color: var(--bad); font-size: 14px; margin-top: 8px; overflow-wrap: anywhere; }
+  h2 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; }
+  ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 70vh; overflow-y: auto; }
+  li { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: center;
+       padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+  .plate { grid-row: span 2; background: var(--plate); color: #111; border: 2px solid #111; border-radius: 4px;
+           padding: 4px 10px; font: 700 20px/1 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+           letter-spacing: 1px; }
+  .small { font-size: 12px; color: var(--muted); }
+  .bar { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--ok); }
+  .empty { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ANPR Live</h1>
+  <span class="pill" id="status"><span class="dot"></span><span id="status-text">Connecting…</span></span>
+</header>
+
+<main>
+  <section class="card">
+    <form id="source-form">
+      <label for="source" style="flex-basis:100%;margin:0">Video source</label>
+      <input id="source" name="source" autocomplete="off" spellcheck="false"
+             placeholder="0 for webcam, sample.mp4, or rtsp://user:pass@camera-ip:554/stream">
+      <button class="primary" type="submit">Connect</button>
+    </form>
+    <div class="presets">
+      <button type="button" data-source="0">Webcam</button>
+      <button type="button" data-source="sample.mp4">Sample video</button>
+      <button type="button" data-source="https://s3-eu-west-1.amazonaws.com/jamcams.tfl.gov.uk/00001.07450.mp4">TfL Piccadilly Circus</button>
+    </div>
+
+    <div class="video">
+      <img id="video" src="/stream" alt="Live video with detected vehicles and plates">
+      <p id="placeholder">Waiting for video…</p>
+    </div>
+    <div class="meta">
+      <span>Source: <span id="current-source">–</span></span>
+      <span id="fps"></span>
+    </div>
+    <div class="error" id="error" role="alert"></div>
+  </section>
+
+  <aside class="card">
+    <h2>Plates <span class="small" id="count"></span></h2>
+    <ol id="plates"><li class="empty" style="display:block;border:0">No plates read yet.</li></ol>
+  </aside>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  async function setSource(source) {
+    $('error').textContent = '';
+    const res = await fetch('/source', { method: 'POST', body: JSON.stringify({ source }) });
+    if (!res.ok) $('error').textContent = (await res.json()).error || 'Could not change source';
+  }
+
+  $('source-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const source = $('source').value.trim();
+    if (source) setSource(source);
+  });
+  document.querySelectorAll('[data-source]').forEach((b) =>
+    b.addEventListener('click', () => { $('source').value = b.dataset.source; setSource(b.dataset.source); }));
+
+  // hide the placeholder once frames arrive; if the server restarts, reconnect the stream
+  $('video').addEventListener('load', () => $('placeholder').hidden = true);
+  $('video').addEventListener('error', () => setTimeout(() => $('video').src = '/stream?' + Date.now(), 2000));
+
+  function renderPlates(plates) {
+    $('count').textContent = plates.length ? plates.length + ' cars' : '';
+    if (!plates.length) {
+      $('plates').innerHTML = '<li class="empty" style="display:block;border:0">No plates read yet.</li>';
+      return;
+    }
+    $('plates').replaceChildren(...plates.map((p) => {
+      const li = document.createElement('li');
+      const plate = document.createElement('span');
+      plate.className = 'plate';
+      plate.textContent = p.text;
+      const info = document.createElement('span');
+      info.className = 'small';
+      info.textContent = `Car #${p.car_id} · ${new Date(p.time * 1000).toLocaleTimeString()} · ${Math.round(p.score * 100)}%`;
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.innerHTML = '<span></span>';
+      bar.firstChild.style.width = Math.round(p.score * 100) + '%';
+      li.append(plate, info, bar);
+      return li;
+    }));
+  }
+
+  async function poll() {
+    try {
+      const s = await (await fetch('/status')).json();
+      const pill = $('status');
+      pill.className = 'pill ' + (s.error ? 'error' : s.running ? 'live' : 'ended');
+      $('status-text').textContent = s.error ? 'Error' : s.running ? 'Live' : 'Stopped';
+      $('current-source').textContent = s.source;
+      $('fps').textContent = s.running ? s.fps + ' fps' : '';
+      $('error').textContent = s.error || '';
+      renderPlates(s.plates);
+    } catch {
+      $('status').className = 'pill error';
+      $('status-text').textContent = 'Server offline';
+    }
+  }
+  poll();
+  setInterval(poll, 1000);
+</script>
+</body>
+</html>
