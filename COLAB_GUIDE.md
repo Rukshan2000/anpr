@@ -164,7 +164,7 @@ from google.colab import files
 files.download("/content/anpr/out.mp4")
 ```
 
-Your trained model is saved in `MyDrive/anpr/runs/plates/weights/best.pt`. Copy it into the local project as `models/license_plate_detector.pt` and run `./run.sh` on your Mac.
+Your trained model is saved in `MyDrive/anpr/runs/plates/weights/best.pt`. Copy it into the local project as `backend/models/license_plate_detector.pt` and run `./run.sh dev` on your Mac (see the README). For Sri Lankan plates locally, apply the Step 12e changes to `backend/anpr/plates.py`.
 
 ---
 

@@ -1,0 +1,6 @@
+# unpinned on purpose: the pinned 2023 versions break on current setuptools and can't load models trained with current ultralytics
+ultralytics
+easyocr
+fastapi
+uvicorn
+lap  # ByteTrack
